@@ -246,6 +246,7 @@ They also wrap the base environment with a lightweight proxy so the trainer can 
 - `SimpleSC`
 - `ModerateSC`
 - `ComplexSC`
+These configurations are built upon **generalised MDP-based supply chain optimisation model (Rachman et al, 2026)**: https://arxiv.org/abs/2507.19788.
 
 ### Fine-tuning / evaluation variants
 
