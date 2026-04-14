@@ -189,7 +189,7 @@ Messiah may require a separate licence or private access, depending on your envi
 
 ### Open alternative
 
-If Messiah is not available, it can be replaced with an open-source simulator such as **OR-Gym (Hubbs et al, 2020)**.
+If Messiah is not available, it can be replaced with an open-source simulator such as **OR-Gym (Hubbs et al, 2020)**: https://arxiv.org/abs/2008.06319.
 
 In that case, the recommended approach is to:
 
