@@ -1,12 +1,4 @@
 # merlion_finetuning_general.py
-# Ray/RLlib-only fine-tuning with MERLION Algorithm-3 style local weight perturbations.
-#
-# This script mirrors the control-flow + skip/resume mechanics of
-# `merlion_finetuning_sb3_independent.py`, but for general multi-objective envs
-# and using Ray only.
-#
-# Vector rewards are read from info['mo_reward'] (fallback: info['mo_reward_raw'],
-# then env.unwrapped.vector_reward).
 
 from __future__ import annotations
 

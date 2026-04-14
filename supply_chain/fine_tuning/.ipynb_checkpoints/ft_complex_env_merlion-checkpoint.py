@@ -27,11 +27,8 @@ logger = logging.getLogger("messiah")
 logger.setLevel("DEBUG")
 
 #set objective value range
-#set reward range
-# min_profit = 190.22
-# max_profit = 5679.69
 min_profit = 0
-max_profit = 50_000 # default 50_000
+max_profit = 50_000
 min_emission = 0
 max_emission = 10_000
 max_equity = 5
@@ -103,7 +100,7 @@ class TestComplexSC(gym.Env):
         self.num_objectives = 3
         self._w = None
             
-    # --- NEW: external control of scalarization weights ---
+    # --- external control of scalarization weights ---
     def set_scalarization_weights(self, w):
         w = np.asarray(w, dtype=np.float32).reshape(-1)
         if w.size != self.num_objectives:
@@ -114,23 +111,6 @@ class TestComplexSC(gym.Env):
     def get_scalarization_weights(self):
         return None if self._w is None else self._w.copy()
 
-#     def _get_obs(self):    
-
-#         inv = self.state.node_inventory[:, :, self.timestep]/max(self.max_inv, 1e-8) # Call inventory at each time step
-#         flow = self.state.edge_outputs[:, self.timestep]/max(self.max_flow, 1e-8) # Call order at each time step
-#         # TODO: Add cumulative emission and inequality
-#         arr_obs = np.concatenate((
-#             inv.flatten(),flow.flatten(),
-#             np.array([self.emission, self.inequality], dtype=np.float32)
-#                                  ))
-
-#         emission = min(max((self.emission/1e6)/1e6, 0), 1) #first 1e6 for decimal values, second for normalisation
-#         inequality = min(max((self.inequality)/(self.timestep+1), 0), 1)
-
-#         arr_obs_final = np.concatenate((arr_obs,[emission,inequality]))
-#         arr_obs_final = np.clip(arr_obs_final, 0, 1) #clip obs within abs space
-#         arr_obs_final = np.clip([_ for _ in arr_obs_final], 0.0, 1.0).astype(np.float32)
-#         return arr_obs_final
     def _get_obs(self):
         inv = self.state.node_inventory[:, :, self.timestep] / max(self.max_inv, 1e-8)
         flow = self.state.edge_outputs[:, self.timestep] / max(self.max_flow, 1e-8)
@@ -142,119 +122,14 @@ class TestComplexSC(gym.Env):
             np.array([self.emission, self.inequality], dtype=np.float32)
                                  ))
         
-        emission = min(max((self.emission/1e6)/1e6, 0), 1) #first 1e6 for decimal values, second for normalisation
+        emission = min(max((self.emission/1e6)/1e6, 0), 1) # first 1e6 for decimal values, second for normalisation
         inequality = min(max((self.inequality)/(self.timestep+1), 0), 1)
 
         arr_obs_final = np.concatenate((arr_obs,[emission,inequality]))
         arr_obs_final = np.clip(arr_obs_final, 0, 1) #clip obs within abs space
         arr_obs_final = np.clip([_ for _ in arr_obs], 0.0, 1.0).astype(np.float32)
         return arr_obs_final
-#         emission = np.clip(self.emission / max(max_emission, 1e-8), 0.0, 1.0)
-#         inequality = np.clip(self.inequality / max(self.timestep + 1, 1), 0.0, 1.0)
 
-#         obs = np.concatenate(
-#             (inv.flatten(), flow.flatten(), np.array([emission, inequality], dtype=np.float32)),
-#             axis=0,
-#         )
-#         return np.clip(obs, 0.0, 1.0).astype(np.float32)
-
-
-#     def _calculate_cost(self, t: int, multiples: np.ndarray):
-#         """Compute step + cumulative monetary cost and emission.
-
-#         Returns
-#         -------
-#         step_cost : float
-#         step_emission : float
-#         total_cost : float
-#         total_emission : float
-#         """
-#         # -------------------------
-#         # Edge costs (charged on start)
-#         # -------------------------
-#         edge_money_raw = self.state.edge_costs[:, 0, t]
-#         edge_emis_raw = self.state.edge_costs[:, 1, t]
-
-#         # Log raw NaNs (do not raise on raw, since ComplexState may contain NaNs)
-#         bad_money = np.where(~np.isfinite(edge_money_raw))[0]
-#         if bad_money.size:
-#             logger.warning(
-#                 f"NaNs/Inf in edge_costs money at t={t}: idx={bad_money.tolist()}"
-#             )
-#         bad_emis = np.where(~np.isfinite(edge_emis_raw))[0]
-#         if bad_emis.size:
-#             logger.warning(
-#                 f"NaNs/Inf in edge_costs emission at t={t}: idx={bad_emis.tolist()}"
-#             )
-
-#         # Sanitize BEFORE multiply/sum (important: NaN * 0 == NaN in numpy)
-#         edge_money = np.nan_to_num(edge_money_raw, nan=0.0, posinf=0.0, neginf=0.0)
-#         edge_emis = np.nan_to_num(edge_emis_raw, nan=0.0, posinf=0.0, neginf=0.0)
-
-#         # Optional strict checks on sanitized values
-#         self._assert_finite(edge_money, f"edge_costs_money_sanitized[t={t}]")
-#         self._assert_finite(edge_emis, f"edge_costs_emis_sanitized[t={t}]")
-
-#         # Ensure multiples are finite too (defensive)
-#         self._assert_finite(multiples, f"multiples[t={t}]")
-
-#         step_edge_cost = float(np.sum(edge_money * multiples))
-#         step_edge_emission = float(np.sum(edge_emis * multiples))
-
-#         # -------------------------
-#         # Node holding costs/emissions (delta via cost_counts)
-#         # -------------------------
-#         # Be defensive: cost_counts can be NaN depending on generator/init
-#         cc_t = self.state.cost_counts[:, t]
-#         cc_t = np.nan_to_num(cc_t, nan=0.0, posinf=0.0, neginf=0.0)
-#         self.state.cost_counts[:, t] = cc_t  # write back sanitized slice
-
-#         prev_monetary = float(self.state.cost_counts[0, t])
-#         prev_emission = float(self.state.cost_counts[1, t])
-
-#         self._assert_finite(self.state.cost_counts[:, t], f"cost_counts_before[t={t}]")
-
-#         # Mutates cost_counts[:, t] in-place by ADDING holding costs
-#         count_node_costs(
-#             t,
-#             self.state.node_costs,
-#             self.state.node_inventory,
-#             self.state.node_control,
-#             self.state.cost_counts,
-#         )
-
-#         # Sanitize again in case count_node_costs introduces non-finite values
-#         cc_t2 = self.state.cost_counts[:, t]
-#         if not np.isfinite(cc_t2).all():
-#             logger.warning(
-#                 f"NaNs/Inf in cost_counts after count_node_costs at t={t}; "
-#                 f"nan={np.isnan(cc_t2).sum()} inf={np.isinf(cc_t2).sum()} -> zeroing"
-#             )
-#             self.state.cost_counts[:, t] = np.nan_to_num(
-#                 cc_t2, nan=0.0, posinf=0.0, neginf=0.0
-#             )
-
-#         self._assert_finite(self.state.cost_counts[:, t], f"cost_counts_after[t={t}]")
-
-#         step_node_cost = float(self.state.cost_counts[0, t] - prev_monetary)
-#         step_node_emission = float(self.state.cost_counts[1, t] - prev_emission)
-
-#         # -------------------------
-#         # Step totals + running totals
-#         # -------------------------
-#         self.step_cost = step_edge_cost + step_node_cost
-#         self.step_emission = step_edge_emission + step_node_emission
-
-#         # Final defensive check (catches any remaining non-finite values early)
-#         self._assert_finite(np.array([self.step_cost], dtype=np.float32), f"step_cost[t={t}]")
-#         self._assert_finite(
-#             np.array([self.step_emission], dtype=np.float32), f"step_emission[t={t}]"
-#         )
-
-#         self.total_cost += self.step_cost
-#         self.total_emission += self.step_emission
-
-#         return self.step_cost, self.step_emission, self.total_cost, self.total_emission
 
     def _calculate_cost(self, t: int, multiples: np.ndarray):
         # --- edge costs at this timestep (charged on start) ---
@@ -421,9 +296,6 @@ class TestComplexSC(gym.Env):
         # === Reward Calculation ===
         step_cost, step_emission, _, _ = self._calculate_cost(self.timestep, multiples)
         
-        # self._assert_finite(np.array([step_cost], dtype=np.float32), "step_cost")
-        # self._assert_finite(np.array([step_emission], dtype=np.float32), "step_emission")
-        
         # Read demand and calculate service level
         demand = self.state.edge_orders[-5:self.state.num_edges, self.timestep]
         
@@ -460,39 +332,16 @@ class TestComplexSC(gym.Env):
         reward_2 = step_emission  # step_emission is already negative from complex_state.py
         reward_3 = -0.5 * inequality   # Match exist_sim_param_state.py: -0.5 factor
         
-        #print("inequality:",inequality,"reward 3 raw:", reward_3)
-
-        # === Fixed Scaling ===
-        # Ensure profit scaling handles negative values correctly
-        # if raw_profit < min_profit:
-        #     scaled_reward_1 = 0.0
-        # elif raw_profit > max_profit:
-        #     scaled_reward_1 = 1.0
-        # else:
         scaled_reward_1 = (reward_1 - min_profit) / (max_profit - min_profit)
 
-        # Emission scaling - match exist_sim_param_state.py: (max_emission + reward_2) / (max_emission - min_emission)
-        # where reward_2 = step_emission (already negative)
         scaled_reward_2 = (max_emission + reward_2) / (max_emission - min_emission)
 
-        # Inequality scaling - match exist_sim_param_state.py: max_equity + reward_3
-        # where max_equity = 1 and reward_3 = -0.5 * inequality
-        #scaled_reward_3 = max_equity + reward_3  # This gives: 1 + (-0.5 * inequality)
         scaled_reward_3 = (max_equity + reward_3) / (max_equity - min_equity)
         
-        #print("scaled reward 3:", scaled_reward_3)
-        
         self.reward_to_save.append([self.timestep, reward_1, reward_2, reward_3])
-        # if terminated and self.save_filename is not None:
-        #     with open(self.save_filename, 'wb') as f:
-        #         pickle.dump(self.reward_to_save, f)
         
         # Create vector reward
         self.vector_reward = np.array([scaled_reward_1, scaled_reward_2, scaled_reward_3])
-        #print(f"vector rewards:{self.vector_reward}") ##debugging
-
-        # Ensure all rewards are in [0, 1]
-        #self.vector_reward = np.clip(self.vector_reward, 0.0, 1.0)
 
         # Calculate scalar reward
         self.scalar_reward = float(np.dot(self.vector_reward, self._w))
@@ -503,7 +352,6 @@ class TestComplexSC(gym.Env):
         self.emission += raw_emission
 
         # Update cumulative metrics for observation
-        #self.emission += (((max_emission-min_emission)*self.vector_reward[1])-max_emission)
         self.inequality = ((self.inequality * self.timestep) + self.vector_reward[2]) / (self.timestep + 1)
 
         observation = self._get_obs()
@@ -518,21 +366,6 @@ class TestComplexSC(gym.Env):
         #print(info) ## debugging
         
         self.last_multi_reward = info["mo_reward"]
-
-        # if self.timestep < 3:  # Debugging
-        #     print(dict(
-        #         t=self.timestep,
-        #         rewards=[reward_1, reward_2, reward_3],
-        #         scaled_rewards=self.vector_reward.tolist(),
-        #         weights=self.weights.tolist(),
-        #         scalar_reward=float(self.scalar_reward),
-        #         step_cost=step_cost,
-        #         step_emission=step_emission,
-        #         inequality=inequality
-        #     ))
-        
-        # self._assert_finite(observation, "obs") # debugging
-        # self._assert_finite(np.array([self.vector_reward], dtype=np.float32), "reward")
 
         return observation, self.scalar_reward, truncated, False, info
 

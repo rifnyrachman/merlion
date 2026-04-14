@@ -113,14 +113,8 @@ class TestSimpleSC(gym.Env):
         
     def _get_obs(self):    
         
-        # inv = np.zeros(
-        #     ((self.state.num_nodes-2), self.state.num_products)
-        # ) # Assuming 0 initial inventory
-        # flow = np.zeros((self.state.num_edges), dtype=np.float32)
-        
         inv = self.state.node_inventory[:, :, self.timestep]/self.max_inv # Call inventory at each time step
         flow = self.state.edge_outputs[:, self.timestep]/self.max_flow # Call order at each time step
-        # TODO: Add cumulative emission and inequality
         arr_obs = np.concatenate((
             inv.flatten(),flow.flatten(),
             np.array([self.emission, self.inequality], dtype=np.float32)
@@ -130,8 +124,6 @@ class TestSimpleSC(gym.Env):
         
         return arr_obs_final
         
-        #TODO: normalise the inventory and flow, add cumulative emission and average inequality
-        
     def _calculate_cost(self, t: int, multiples: np.ndarray):
         # --- edge costs at this timestep (charged on start) ---
         step_edge_cost     = float(np.sum(self.state.edge_costs[:, 0, t] * multiples))
@@ -140,13 +132,7 @@ class TestSimpleSC(gym.Env):
         # --- node holding costs/emissions at this timestep via delta ---
         prev_monetary  = float(self.state.cost_counts[0, t])
         prev_emission  = float(self.state.cost_counts[1, t])
-        
-        # print(
-        #     "prev_monetary", prev_monetary,
-        #     "prev_emission", prev_emission
-        # )
 
-        # Mutates cost_counts[:, t] in-place by ADDING step holding costs
         count_node_costs(
             t,
             self.state.node_costs,
@@ -157,12 +143,6 @@ class TestSimpleSC(gym.Env):
         
         step_node_cost     = float(self.state.cost_counts[0, t] - prev_monetary)
         step_node_emission = float(self.state.cost_counts[1, t] - prev_emission)
-        
-        # print(
-        #     "self.state.cost_counts[0, t]:", self.state.cost_counts[0, t],
-        #     "float(self.state.cost_counts[1, t]", float(self.state.cost_counts[1, t]
-        #                                                )
-        # )
 
         # step totals (this timestep only)
         self.step_cost     = step_edge_cost + step_node_cost
@@ -172,14 +152,6 @@ class TestSimpleSC(gym.Env):
         self.total_cost     += self.step_cost
         self.total_emission += self.step_emission
 
-        # print(
-        #     "timestep:", self.timestep,
-        #     "step edge cost:", step_edge_cost,
-        #     "step edge emission:", step_edge_emission,
-        #     "step node cost:", step_node_cost,
-        #     "step node emission:", step_node_emission
-        # ) ## Debugging
-        # return STEP values (use these for reward), plus totals if you want
         return self.step_cost, self.step_emission, self.total_cost, self.total_emission
     
     def _step_state(self):
@@ -259,13 +231,12 @@ class TestSimpleSC(gym.Env):
     def step(self, action):
         self._step_state() # RL agent learns delta policy rather than from scratch
         max_multiple = 200  # Max delivery quantity
-        # Scale from (-1, 1) → (0, 1), then → (0, max_multiple), then round
         multiples = ((action + 1) / 2) * max_multiple
         multiples = np.round(multiples).astype(self.state.int_dtype)
         
         try:
             #print(f"multiple-{self.timestep}",multiples) ##debugging
-            multiples = allocate_greedily( ##debugging from no 'self.state ='
+            multiples = allocate_greedily(
                 t=self.timestep,
                 state=self.state,
                 requested_multiples=multiples)
@@ -284,7 +255,6 @@ class TestSimpleSC(gym.Env):
             )
 
         if self._w is None:
-            # be defensive; should have been set in reset() or by trainer
             self.set_scalarization_weights(np.ones(self.num_objectives, dtype=np.float32))
         self.scalar_reward = float(np.dot(self.vector_reward, self._w))
         
@@ -315,40 +285,19 @@ class TestSimpleSC(gym.Env):
         reward_2 = step_emission  # step_emission is already negative from simple_state.py
         reward_3 = -0.5 * inequality   # Match exist_sim_param_state.py: -0.5 factor
 
-        # === Fixed Scaling ===
-        # Ensure profit scaling handles negative values correctly
-        # if raw_profit < min_profit:
-        #     scaled_reward_1 = 0.0
-        # elif raw_profit > max_profit:
-        #     scaled_reward_1 = 1.0
-        # else:
         scaled_reward_1 = (reward_1 - min_profit) / (max_profit - min_profit)
-
-        # Emission scaling - match exist_sim_param_state.py: (max_emission + reward_2) / (max_emission - min_emission)
-        # where reward_2 = step_emission (already negative)
         scaled_reward_2 = (max_emission + reward_2) / (max_emission - min_emission)
-
-        # Inequality scaling - match exist_sim_param_state.py: max_equity + reward_3
-        # where max_equity = 1 and reward_3 = -0.5 * inequality
-        scaled_reward_3 = max_equity + reward_3  # This gives: 1 + (-0.5 * inequality)
+        scaled_reward_3 = max_equity + reward_3 
         
         self.reward_to_save.append([self.timestep, reward_1, reward_2, reward_3])
-        # if terminated and self.save_filename is not None:
-        #     with open(self.save_filename, 'wb') as f:
-        #         pickle.dump(self.reward_to_save, f)
         
         # Create vector reward
         self.vector_reward = np.array([scaled_reward_1, scaled_reward_2, scaled_reward_3])
         #print(f"vector rewards:{self.vector_reward}") ##debugging
 
-        # Ensure all rewards are in [0, 1]
-        #self.vector_reward = np.clip(self.vector_reward, 0.0, 1.0)
-
         # Calculate scalar reward
         self.scalar_reward = np.dot(self.vector_reward, self._w)
 
-        # Update cumulative metrics for observation
-        #self.emission += (((max_emission-min_emission)*self.vector_reward[1])-max_emission)
         self.inequality = self.vector_reward[2]
 
         observation = self._get_obs()
@@ -360,7 +309,6 @@ class TestSimpleSC(gym.Env):
             "weights": self._w
         }
         
-        #print(info) ## debugging
         
         self.last_multi_reward = info["mo_reward"]
 

@@ -11,12 +11,11 @@ from random import randrange
 
 import pandas as pd
 
-sys.path.append("/home/rifnyrachman7/_merlion/ds-project-messiah/src")
 from messiah.generators.base import Generator
 from messiah.state import State
 
 # Read Input file
-file = "/home/rifnyrachman7/_merlion/data_input_v2.xlsx"
+file = "merlion/data_input_v2.xlsx" # change to your file directory
 df = pd.read_excel(file, sheet_name="Parameters")
 
 # Edge-level parameters
@@ -51,13 +50,10 @@ class TestModerateState(Generator):
         num_timesteps: int,
         datetime_freq:str = "d",
         datetime_start: pd.Timestamp = None,
-        #randomise: bool = True, # Assuming all parameters are randomised
         **kwargs,
     ) -> None:
         
         super().__init__(num_timesteps, datetime_freq, datetime_start, **kwargs)
-        
-        #self.randomise = randomise
 
         #define constants
         self.num_timesteps = num_timesteps

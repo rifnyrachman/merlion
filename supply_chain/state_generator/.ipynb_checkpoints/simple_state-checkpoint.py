@@ -41,13 +41,10 @@ class SimpleState(Generator):
         num_timesteps: int,
         datetime_freq:str = "d",
         datetime_start: pd.Timestamp = None,
-        #randomise: bool = True, # Assuming all parameters are randomised
         **kwargs,
     ) -> None:
         
         super().__init__(num_timesteps, datetime_freq, datetime_start, **kwargs)
-        
-        #self.randomise = randomise
 
         #define constants
         self.num_timesteps = num_timesteps
@@ -271,12 +268,7 @@ class SimpleState(Generator):
         self.node_wastage.fill(0)
         self.cost_counts.fill(0)
         self.edge_orders.fill(0)
-        self.node_inventory.fill(0) # Similar to init, no need redefining
-        
-        # self.node_inventory[1, 1, 0] = 380
-        # self.node_inventory[2, 1, 0] = 350
-        # self.node_inventory[3, 1, 0] = 400
-        # self.node_inventory[4, 1, 0] = 80
+        self.node_inventory.fill(0) 
         
         self.node_inventory[1, 1, :] = 380
         self.node_inventory[2, 1, :] = 350

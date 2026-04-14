@@ -50,13 +50,10 @@ class TestModerateState(Generator):
         num_timesteps: int,
         datetime_freq:str = "d",
         datetime_start: pd.Timestamp = None,
-        #randomise: bool = True, # Assuming all parameters are randomised
         **kwargs,
     ) -> None:
         
         super().__init__(num_timesteps, datetime_freq, datetime_start, **kwargs)
-        
-        #self.randomise = randomise
 
         #define constants
         self.num_timesteps = num_timesteps

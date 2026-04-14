@@ -9,8 +9,6 @@ import random
 import pickle
 
 import sys
-sys.path.append("/home/rifnyrachman7/_merlion") #access to this folder
-sys.path.append("/home/rifnyrachman7/_merlion/ds-project-messiah/src/messiah") #access to messiah
 from state_generator.moderate_state import ModerateState
 from gymnasium import spaces
 
@@ -28,14 +26,11 @@ logger = logging.getLogger("messiah")
 logger.setLevel("DEBUG")
 
 #set objective value range
-#set reward range
-# min_profit = 190.22
-# max_profit = 5679.69
 min_profit = 0
-max_profit = 5000 # previously 2000
-min_emission = 0 # previously 7.38
-max_emission = 5000 # previously 2500 # previously 3596.1
-max_equity = 5 # previously 2
+max_profit = 5000
+min_emission = 0
+max_emission = 5000
+max_equity = 5
 min_equity = 0
 
 #define the agents
@@ -46,7 +41,7 @@ agents = [
     FixedProcessingAgent(multiple = 1, edge_tags = ["supply"], part_fulfil = True)
 ]
 
-# [NEW] thin wrapper so RLlib/VectorEnv wrappers can still call into env
+# thin wrapper so RLlib/VectorEnv wrappers can still call into env
 class ScalarizationWeightProxy(gym.Wrapper):
     """Forward (get|set)_scalarization_weights through any wrapper chain."""
     def set_scalarization_weights(self, w):
@@ -104,7 +99,7 @@ class TestModerateSC(gym.Env):
         self.num_objectives = 3
         self._w = None
         
-    # --- NEW: external control of scalarization weights ---
+    # --- external control of scalarization weights ---
     def set_scalarization_weights(self, w):
         w = np.asarray(w, dtype=np.float32).reshape(-1)
         if w.size != self.num_objectives:
@@ -117,11 +112,6 @@ class TestModerateSC(gym.Env):
         
     def _get_obs(self):    
         
-        # inv = np.zeros(
-        #     ((self.state.num_nodes-2), self.state.num_products)
-        # ) # Assuming 0 initial inventory
-        # flow = np.zeros((self.state.num_edges), dtype=np.float32)
-        
         inv = self.state.node_inventory[:, :, self.timestep]/self.max_inv # Call inventory at each time step
         flow = self.state.edge_outputs[:, self.timestep]/self.max_flow # Call order at each time step
         # TODO: Add cumulative emission and inequality
@@ -133,8 +123,6 @@ class TestModerateSC(gym.Env):
         arr_obs_final = np.clip([_ for _ in arr_obs], 0.0, 1.0).astype(np.float32)
         
         return arr_obs_final
-        
-        #TODO: normalise the inventory and flow, add cumulative emission and average inequality
         
     def _calculate_cost(self, t: int, multiples: np.ndarray):
         # --- edge costs at this timestep (charged on start) ---
@@ -150,7 +138,6 @@ class TestModerateSC(gym.Env):
         #     "prev_emission", prev_emission
         # )
 
-        # Mutates cost_counts[:, t] in-place by ADDING step holding costs
         count_node_costs(
             t,
             self.state.node_costs,
@@ -183,7 +170,6 @@ class TestModerateSC(gym.Env):
         #     "step node cost:", step_node_cost,
         #     "step node emission:", step_node_emission
         # ) ## Debugging
-        # return STEP values (use these for reward), plus totals if you want
         return self.step_cost, self.step_emission, self.total_cost, self.total_emission
     
     def _step_state(self):
@@ -262,13 +248,12 @@ class TestModerateSC(gym.Env):
     def step(self, action):
         self._step_state() # RL agent learns delta policy rather than from scratch
         max_multiple = 200  # Max delivery quantity
-        # Scale from (-1, 1) → (0, 1), then → (0, max_multiple), then round
         multiples = ((action + 1) / 2) * max_multiple
         multiples = np.round(multiples).astype(self.state.int_dtype)
         
         try:
             #print(f"multiple-{self.timestep}",multiples) ##debugging
-            multiples = allocate_greedily( ##debugging from no 'self.state ='
+            multiples = allocate_greedily(
                 t=self.timestep,
                 state=self.state,
                 requested_multiples=multiples)
@@ -276,7 +261,6 @@ class TestModerateSC(gym.Env):
         except Exception as e:
             #print(self.state)
             print("start_processes failed:", e)
-            # You may want to return zero reward or handle failure here
         
         start_processes(self.timestep, self.state, multiples, safe=True)
 
@@ -319,41 +303,19 @@ class TestModerateSC(gym.Env):
         reward_1 = step_cost
         reward_2 = step_emission  # step_emission is already negative from moderate_state.py
         reward_3 = -0.5 * inequality   # Match exist_sim_param_state.py: -0.5 factor
-        # === Fixed Scaling ===
-        # Ensure profit scaling handles negative values correctly
-        # if raw_profit < min_profit:
-        #     scaled_reward_1 = 0.0
-        # elif raw_profit > max_profit:
-        #     scaled_reward_1 = 1.0
-        # else:
         scaled_reward_1 = (reward_1 - min_profit) / (max_profit - min_profit)
-
-        # Emission scaling - match exist_sim_param_state.py: (max_emission + reward_2) / (max_emission - min_emission)
-        # where reward_2 = step_emission (already negative)
         scaled_reward_2 = (max_emission + reward_2) / (max_emission - min_emission)
-
-        # Inequality scaling - match exist_sim_param_state.py: max_equity + reward_3
-        # where max_equity = 1 and reward_3 = -0.5 * inequality
-        #scaled_reward_3 = max_equity + reward_3  # This gives: 1 + (-0.5 * inequality)
         scaled_reward_3 = (max_equity + reward_3) / (max_equity - min_equity)
         
         self.reward_to_save.append([self.timestep, reward_1, reward_2, reward_3])
-        # if terminated and self.save_filename is not None:
-        #     with open(self.save_filename, 'wb') as f:
-        #         pickle.dump(self.reward_to_save, f)
         
         # Create vector reward
         self.vector_reward = np.array([scaled_reward_1, scaled_reward_2, scaled_reward_3])
         #print(f"vector rewards:{self.vector_reward}") ##debugging
 
-        # Ensure all rewards are in [0, 1]
-        #self.vector_reward = np.clip(self.vector_reward, 0.0, 1.0)
-
         # Calculate scalar reward
         self.scalar_reward = np.dot(self.vector_reward, self._w)
 
-        # Update cumulative metrics for observation
-        #self.emission += (((max_emission-min_emission)*self.vector_reward[1])-max_emission)
         self.inequality = self.vector_reward[2]
 
         observation = self._get_obs()
@@ -365,21 +327,7 @@ class TestModerateSC(gym.Env):
             "weights": self._w
         }
         
-        #print(info) ## debugging
-        
         self.last_multi_reward = info["mo_reward"]
-
-        # if self.timestep < 3:  # Debugging
-        #     print(dict(
-        #         t=self.timestep,
-        #         rewards=[reward_1, reward_2, reward_3],
-        #         scaled_rewards=self.vector_reward.tolist(),
-        #         weights=self.weights.tolist(),
-        #         scalar_reward=float(self.scalar_reward),
-        #         step_cost=step_cost,
-        #         step_emission=step_emission,
-        #         inequality=inequality
-        #     ))
 
         return observation, self.scalar_reward, truncated, False, info
 

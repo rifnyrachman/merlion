@@ -1,7 +1,4 @@
 "In this version, multipe tasks are sampled within a inner loop batch."
-# merlion_fixed.py
-# MERLION: Meta Multi-Objective RL with Evolutionary Technique
-# This file fixes reward breakdown and aligns Algorithms 1, 2, 3 with the proposal.
 
 import sys, os
 # sys.path.append("/home/rifnyrachman7/_metamorl")
@@ -198,66 +195,7 @@ def _coerce_weight_dim(w, D: int) -> np.ndarray:
         v /= s
     return v
 
-# ==================
-# RLlib Callbacks
-# ==================
 
-# class MERLIONCallbacks(DefaultCallbacks):
-#     def on_postprocess_trajectory(
-#         self, *, worker, episode, agent_id, policy_id, policies,
-#         postprocessed_batch: SampleBatch, original_batches, **kwargs
-#     ):
-#         D = _infer_num_objectives_from_workers(workers, fallback=2) # get number of objectives
-#         try:
-#             # 1) Get the first mapping value from original_batches
-#             first_val = next(iter(original_batches.values()))
-
-#             # 2) Find the SampleBatch inside it:
-#             #    - In newer RLlib: (policy, batch) or (policy, batch, agent_id)
-#             #    - In some paths, value may already be a SampleBatch
-#             orig_batch = None
-#             if isinstance(first_val, (list, tuple)):
-#                 for x in first_val:
-#                     if isinstance(x, SampleBatch):
-#                         orig_batch = x
-#                         break
-#             elif isinstance(first_val, SampleBatch):
-#                 orig_batch = first_val
-
-#             if orig_batch is None:
-#                 # Nothing we can do without the original SampleBatch
-#                 return
-
-#             # 3) Pull per-step infos robustly
-#             infos = orig_batch.get(SampleBatch.INFOS, None)
-#             if infos is None:
-#                 # Some stacks store it under "infos"
-#                 infos = orig_batch.get("infos", None)
-#             if infos is None:
-#                 return
-
-#             # Guard length match
-#             if len(infos) != len(postprocessed_batch):
-#                 # Different lengths: don't attempt to align step-wise
-#                 return
-
-#             # 4) Extract mo_reward from each step's info (default to zeros)
-#             mo = []
-#             for info in infos:
-#                 if isinstance(info, dict) and ("mo_reward" in info):
-#                     v = info["mo_reward"]
-#                 else:
-#                     v = [_ for _ in range(D)]
-#                 mo.append(v)
-#             mo = np.asarray(mo, dtype=np.float32)
-
-#             # 5) Write per-step fields used by the trainer
-#             postprocessed_batch["mo_reward_vec"] = mo
-#             for d in range(D):
-#                 postprocessed_batch[f"rewards-{d}"] = mo[:, d]
-
-#         except Exception as e:
-#             logger.error(f"MERLIONCallbacks error: {e}")
 class MERLIONCallbacks(DefaultCallbacks):
     def on_postprocess_trajectory(
         self, *, worker, episode, agent_id, policy_id, policies,
@@ -320,9 +258,6 @@ class MERLIONCallbacks(DefaultCallbacks):
         postprocessed_batch["mo_reward_vec"] = mo
         for d in range(D):
             postprocessed_batch[f"rewards-{d}"] = mo[:, d]
-        # except Exception as e:
-        #     logger.error(f"MERLIONCallbacks error: {e}")
-
 
 # ==================
 # Config

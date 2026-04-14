@@ -1,3 +1,5 @@
+"""Complex State"""
+
 from typing import Any
 
 import awkward as ak
@@ -15,62 +17,124 @@ from messiah.state import State
 
 # Read Input file
 file = "/home/rifnyrachman7/_merlion/data_input_v2.xlsx"
-df = pd.read_excel(file, sheet_name="Parameters_simple")
+df = pd.read_excel(file, sheet_name="Parameters_complex")
 
 # Edge-level parameters
-emission_edge = df["GHG_Unit"].iloc[:8].to_numpy()
-emission_edge = np.concatenate([emission_edge, [0, 0]])  # Supplying to markets costs 0
-cost_edge = df["Cost_process"].iloc[:8].to_numpy()
-cost_edge = np.concatenate([cost_edge, [0, 0]])  # Add 0 values at markets
+emission_edge = df["GHG_Unit"].iloc[:59].to_numpy()
+emission_edge = np.concatenate([emission_edge, [0, 0, 0, 0, 0]])  # Supplying to 3 markets costs 0
+cost_edge = df["Cost_process"].iloc[:59].to_numpy()
+cost_edge = np.concatenate([cost_edge, [0, 0, 0, 0, 0]])  # Add 0 values at 3 markets
 
 # Node-level parameters
-emission_node = df["GHG_Unit"].iloc[8:].to_numpy()
-emission_node = np.concatenate([[0], emission_node, [0, 0]])  # Supplier + markets = 0
-cost_node = df["Cost_Inv"].iloc[8:].to_numpy()
-cost_node = np.concatenate([[0], cost_node, [0, 0]])
+emission_node = df["GHG_Unit"].iloc[59:].to_numpy()
+emission_node = np.concatenate([[0, 0, 0], emission_node, [0, 0, 0, 0, 0]])  # Supplier + markets = 0
+cost_node = df["Cost_Inv"].iloc[59:].to_numpy()
+cost_node = np.concatenate([[0, 0, 0], cost_node, [0, 0, 0, 0, 0]]) # Plus 2 suppliers and 3 markets
 
 # Define initial inventories
-init_inv_series = df["Initial_Inv"].iloc[8:].to_numpy()           # length 4
+init_inv_series = df["Initial_Inv"].iloc[59:].to_numpy()           # length 8
 init_inv_series = np.nan_to_num(init_inv_series, nan=0.0)         # safety
 init_inv_series = np.clip(init_inv_series, 0, None)
 
-class SimpleState(Generator):
+class ComplexState(Generator):
     
     def __init__(
         self,
         num_timesteps: int,
         datetime_freq:str = "d",
         datetime_start: pd.Timestamp = None,
+        #randomise: bool = True, # Assuming all parameters are randomised
         **kwargs,
     ) -> None:
         
         super().__init__(num_timesteps, datetime_freq, datetime_start, **kwargs)
+        
+        #self.randomise = randomise
 
         #define constants
         self.num_timesteps = num_timesteps
-        self.num_nodes = 7
-        self.num_edges = 10 # 8 delivery, 2 production
+        self.num_nodes = 24
+        self.num_edges = 64
         self.num_products = 2
         self.num_costs = 2
-        self.num_market = 2
+        self.num_market = 5
 
         #define the names dictionary
         node_names = np.array(
-            ["supplier0", "factory1", "factory2", "retailer3", "retailer4", "market5", "market6"],
+            ["supplier0", "supplier1", "supplier2", "factory3", "factory4", "factory5",
+             "factory6", "factory7", "warehouse8", "warehouse9", "warehouse10", "distributor11",
+             "distributor12", "distributor13", "retailer14", "retailer15", "retailer16",
+             "retailer17", "retailer18", "market19", "market20", "market21", "market22", "market23"
+            ],
             dtype=np.str_,
         )
         edge_names = np.array(
             [
-                "supplier0_factory1",
-                "supplier0_factory2",
-                "factory1_factory1",
-                "factory2_factory2",
-                "factory1_retailer3",
-                "factory1_retailer4",
-                "factory2_retailer3",
-                "factory2_retailer4",
-                "retailer3_market5",
-                "retailer4_market6",
+                "supplier0_factory3",
+                "supplier0_factory4",
+                "supplier0_factory5",
+                "supplier0_factory6",
+                "supplier0_factory7",
+                
+                "supplier1_factory3",
+                "supplier1_factory4",
+                "supplier1_factory5",
+                "supplier1_factory6",
+                "supplier1_factory7",
+                
+                "supplier2_factory3",
+                "supplier2_factory4",
+                "supplier2_factory5",
+                "supplier2_factory6",
+                "supplier2_factory7",
+                
+                "factory3_warehouse8",
+                "factory3_warehouse9",
+                "factory3_warehouse10",
+                
+                "factory4_warehouse8",
+                "factory4_warehouse9",
+                "factory4_warehouse10",
+                
+                "factory5_warehouse8",
+                "factory5_warehouse9",
+                "factory5_warehouse10",
+                
+                "warehouse8_distributor11",
+                "warehouse8_distributor12",
+                "warehouse8_distributor13",
+                
+                "warehouse9_distributor11",
+                "warehouse9_distributor12",
+                "warehouse9_distributor13",
+            
+                "warehouse10_distributor11",
+                "warehouse10_distributor12",
+                "warehouse10_distributor13",
+                
+                "distributor11_retailer14",
+                "distributor11_retailer15",
+                "distributor11_retailer16",
+                "distributor11_retailer17",
+                "distributor11_retailer18",
+                
+                "distributor12_retailer14",
+                "distributor12_retailer15",
+                "distributor12_retailer16",
+                "distributor12_retailer17",
+                "distributor12_retailer18",
+                
+                "distributor13_retailer14",
+                "distributor13_retailer15",
+                "distributor13_retailer16",
+                "distributor13_retailer17",
+                "distributor13_retailer18",
+                
+                "retailer14_market19",
+                "retailer15_market20",
+                "retailer16_market21",
+                "retailer17_market22",
+                "retailer18_market23",
             ],
             dtype=np.str_,
         )
@@ -79,24 +143,95 @@ class SimpleState(Generator):
         node_tags = ak.Array(
             [
                 ["supplier"],
+                ["supplier"],
+                ["supplier"],
                 ["factory"],
                 ["factory"],
+                ["factory"],
+                ["factory"],
+                ["factory"],
+                ["warehouse"],
+                ["warehouse"],
+                ["warehouse"],
+                ["distributor"],
+                ["distributor"],
+                ["distributor"],
+                ["retailer"],
+                ["retailer"],
+                ["retailer"],
                 ["retailer"],
                 ["retailer"],
                 ["market"],
                 ["market"],
+                ["market"],
+                ["market"],
+                ["market"]
             ]
         )
         edge_tags = ak.Array(
             [
                 ["supply"],
                 ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
+                ["supply"],
                 ["production"],
                 ["production"],
+                ["production"],
+                ["production"],
+                ["production"],
                 ["distribution"],
                 ["distribution"],
                 ["distribution"],
                 ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["distribution"],
+                ["demand"],
+                ["demand"],
+                ["demand"],
                 ["demand"],
                 ["demand"]
             ]
@@ -126,17 +261,27 @@ class SimpleState(Generator):
         }
 
         #define the upstream and downstream nodes
-        self.edge_upstream_nodes = np.array([0, 0, 1, 2, 1, 1, 2, 2, 3, 4], dtype=self.int_dtype)
-        self.edge_downstream_nodes = np.array([1, 2, 1, 2, 3, 4, 3, 4, 5, 6], dtype=self.int_dtype)
+        self.edge_upstream_nodes = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+                                             3, 4, 5, 6, 7, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6,
+                                             7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 11,
+                                             11, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 14, 15, 16,
+                                             17, 18
+                                            ], dtype=self.int_dtype)
+        self.edge_downstream_nodes = np.array([3, 4, 5, 6, 7, 3, 4, 5, 6, 7, 3, 4, 5, 6, 7,
+                                               3, 4, 5, 6, 7, 8, 9, 10, 8, 9, 10, 8, 9, 10,
+                                               8, 9, 10, 8, 9, 10, 11, 12, 13, 11, 12, 13,
+                                               11, 12, 13, 14, 15, 16, 17, 18, 14, 15, 16, 17, 18,
+                                               14, 15, 16, 17, 18, 19, 20, 21, 22, 23
+                                              ],dtype=self.int_dtype)
 
         #define the input and output products based on the product_tags
         self.edge_input_products = np.array(
-            [[1,0],[1,0],[1,0],[1,0],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1]],
+            [[1,0]]*20 + [[0,1]]*44,
             dtype=self.int_dtype,
         )
 
         self.edge_output_products = np.array(
-            [[1,0],[1,0],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1]],
+            [[1,0]]*15 + [[0,1]]*49,
             dtype=self.int_dtype,
         )
 
@@ -159,25 +304,26 @@ class SimpleState(Generator):
 
         # Monetary costs
         for i in range(self.num_edges): # Random factor is set to negative for costs
-            random_factors = self.random_param(
+            random_factors = np.clip(self.random_param(
                 loc=1.0, scale=0.1, size=self.num_timesteps
-            )
+            ), 0.1, 10.0)
             self.edge_costs[i, 0, :] = -cost_edge[i] * random_factors
 
         # Emission costs with different random factors
         for i in range(self.num_edges):
-            random_factors = self.random_param(
+            random_factors = np.clip(self.random_param(
                 loc=1.0, scale=0.1, size=self.num_timesteps
-            )
+            ), 0.1, 10.0)
             self.edge_costs[i, 1, :] = -emission_edge[i] * random_factors
 
         # Overwrite the last 2 edges (prices), shape = num_edge, num_cost, num_timesteps
-        for i in range(self.num_edges-self.num_market, self.num_edges): # For the last 2 edges
-            random_factors = self.random_param(
-                loc=1.0, scale=0.1, size=self.num_timesteps
-            )
-            self.edge_costs[i, 0, :] = 20 * random_factors # num_cost is set only for monetary
+        random_factors = np.clip(self.random_param(
+            loc=1.0, scale=0.1, size=self.num_timesteps
+        ), 0.1, 10.0)
+        base_prices = np.array([100, 101, 105, 103, 104]) # num_cost is set only for monetary
 
+        self.edge_costs[-self.num_market:, 0, :] = base_prices[:, np.newaxis] * random_factors[np.newaxis, :]
+        
         # Start with 0 movements
         self.edge_inputs = np.zeros(
             (self.num_edges, self.num_timesteps), dtype=self.int_dtype
@@ -186,16 +332,14 @@ class SimpleState(Generator):
             (self.num_edges, self.num_timesteps), dtype=np.float32
         )  # Start with 0 movements
         self.node_control = np.array(
-            [False, True, True, True, True, False, False], dtype=np.bool_
+            [False]*3 + [True]*16 + [False]*5, dtype=np.bool_
         )  # Only the factory and retailer controlled by us
         self.node_inventory = np.zeros(
             (self.num_nodes, self.num_products, self.num_timesteps), dtype=self.int_dtype
         )
-#         #Put them on nodes 1..4, product channel = 1, at t=0
-        self.node_inventory[1, 1, :] = 380
-        self.node_inventory[2, 1, :] = 350
-        self.node_inventory[3, 1, :] = 400
-        self.node_inventory[4, 1, :] = 80
+        
+        for i in range(16):
+            self.node_inventory[i, 1, :] = init_inv_series[i]
         
         self.node_wastage = np.zeros(
             (self.num_nodes, self.num_products, self.num_timesteps), dtype=self.int_dtype
@@ -211,15 +355,15 @@ class SimpleState(Generator):
         )  # Each product costs 1 to hold
         # Monetary node costs
         for i in range(self.num_nodes):
-            random_factors = self.random_param(
-                loc=1, scale=0.1, size=self.num_timesteps
-            )
+            random_factors = np.clip(self.random_param(
+                loc=1.0, scale=0.1, size=self.num_timesteps
+            ), 0.1, 10.0)
             self.node_costs[i, :, 0, :] = -cost_node[i] * random_factors
         # Emission node costs
         for i in range(self.num_nodes):
-            random_factors = self.random_param(
-                loc=1, scale=0.1, size=self.num_timesteps
-            )
+            random_factors = np.clip(self.random_param(
+                loc=1.0, scale=0.1, size=self.num_timesteps
+            ), 0.1, 10.0)
             self.node_costs[i, :, 1, :] = -emission_node[i] * random_factors
         
         self.cost_counts = np.zeros(
@@ -268,12 +412,10 @@ class SimpleState(Generator):
         self.node_wastage.fill(0)
         self.cost_counts.fill(0)
         self.edge_orders.fill(0)
-        self.node_inventory.fill(0) 
+        self.node_inventory.fill(0) # Similar to init, no need redefining
         
-        self.node_inventory[1, 1, :] = 380
-        self.node_inventory[2, 1, :] = 350
-        self.node_inventory[3, 1, :] = 400
-        self.node_inventory[4, 1, :] = 80
+        for i in range(16):
+            self.node_inventory[i, 1, :] = init_inv_series[i]
         
         self.define_demand() # Randomise demand every state generation
         
@@ -295,11 +437,12 @@ class SimpleState(Generator):
             self.edge_costs[i, 1, :] = -emission_edge[i] * random_factors
 
         # Overwrite the last 2 edges (prices), shape = num_edge, num_cost, num_timesteps
-        for i in range(self.num_edges-self.num_market, self.num_edges): # For the last 2 edges
-            random_factors = self.random_param(
-                loc=1.0, scale=0.1, size=self.num_timesteps
-            )
-            self.edge_costs[i, 0, :] = 20 * random_factors # num_cost is set only for monetary
+        random_factors = self.random_param(
+            loc=1.0, scale=0.1, size=self.num_timesteps
+        )
+        base_prices = np.array([100, 101, 105, 103, 104]) # num_cost is set only for monetary
+
+        self.edge_costs[-self.num_market:, 0, :] = base_prices[:, np.newaxis] * random_factors[np.newaxis, :]
         
         # === Randomise nodes parameters every episode ===
         self.node_costs.fill(0)
